@@ -1,0 +1,266 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+model User {
+  id            String     @id @default(cuid())
+  email         String     @unique
+  name          String
+  passwordHash  String
+  role          UserRole   @default(SWIMMER)
+  avatarUrl     String?
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
+
+  swimmer       Swimmer?
+  coach         Coach?
+  
+  @@index([email])
+}
+
+enum UserRole {
+  ADMIN
+  COACH
+  ACCOUNTANT
+  SWIMMER
+}
+
+model Swimmer {
+  id            String     @id @default(cuid())
+  swimmerCode   String     @unique
+  name          String
+  dob           DateTime
+  gender        String
+  contact       String
+  email         String
+  membershipType MembershipType @default(STANDARD)
+  status        SwimmerStatus   @default(ACTIVE)
+  photoUrl      String?
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
+
+  userId        String?    @unique
+  user          User?      @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  sessionEnrollments SessionEnrollment[]
+  attendances        Attendance[]
+  performanceRecords PerformanceRecord[]
+  payments           Payment[]
+  trainingGoals      TrainingGoal[]
+  
+  @@index([swimmerCode])
+  @@index([email])
+}
+
+enum MembershipType {
+  STANDARD
+  PREMIUM
+  ELITE
+}
+
+enum SwimmerStatus {
+  ACTIVE
+  INACTIVE
+  SUSPENDED
+}
+
+model Coach {
+  id            String     @id @default(cuid())
+  name          String
+  specialty     String
+  phone         String
+  photoUrl      String?
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
+
+  userId        String     @unique
+  user          User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  sessions      Session[]
+  
+  @@index([name])
+}
+
+model Pool {
+  id            String     @id @default(cuid())
+  name          String
+  location      String
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
+
+  lanes         Lane[]
+  sessions      Session[]
+  
+  @@index([name])
+}
+
+model Lane {
+  id            String     @id @default(cuid())
+  laneNumber    Int
+  focusArea     String
+  status        LaneStatus @default(ACTIVE)
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
+
+  poolId        String
+  pool          Pool       @relation(fields: [poolId], references: [id], onDelete: Cascade)
+
+  sessionEnrollments SessionEnrollment[]
+  
+  @@unique([poolId, laneNumber])
+  @@index([poolId])
+}
+
+enum LaneStatus {
+  ACTIVE
+  UPCOMING
+  PUBLIC_LAP_SWIMMING
+  MAINTENANCE_CLOSURE
+}
+
+model Session {
+  id            String     @id @default(cuid())
+  name          String
+  sessionDate   DateTime
+  startTime     DateTime
+  endTime       DateTime
+  sessionType   SessionType @default(COMPETITIVE)
+  capacity      Int        @default(24)
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
+
+  poolId        String
+  pool          Pool       @relation(fields: [poolId], references: [id], onDelete: Cascade)
+  
+  coachId       String
+  coach         Coach      @relation(fields: [coachId], references: [id], onDelete: Cascade)
+
+  enrollments   SessionEnrollment[]
+  attendances   Attendance[]
+  payments      Payment[]
+  
+  @@index([sessionDate])
+  @@index([poolId])
+  @@index([coachId])
+}
+
+enum SessionType {
+  COMPETITIVE
+  JUNIOR_ACADEMY
+  PRIVATE
+  RECOVERY
+}
+
+model SessionEnrollment {
+  id            String     @id @default(cuid())
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
+
+  swimmerId     String
+  swimmer       Swimmer    @relation(fields: [swimmerId], references: [id], onDelete: Cascade)
+  
+  sessionId     String
+  session       Session    @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  
+  laneId        String?
+  lane          Lane?      @relation(fields: [laneId], references: [id], onDelete: SetNull)
+  
+  @@unique([swimmerId, sessionId])
+  @@index([swimmerId])
+  @@index([sessionId])
+  @@index([laneId])
+}
+
+model Attendance {
+  id            String     @id @default(cuid())
+  checkIn       DateTime?
+  checkOut      DateTime?
+  status        AttendanceStatus @default(PENDING)
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
+
+  swimmerId     String
+  swimmer       Swimmer    @relation(fields: [swimmerId], references: [id], onDelete: Cascade)
+  
+  sessionId     String
+  session       Session    @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  
+  @@unique([swimmerId, sessionId])
+  @@index([swimmerId])
+  @@index([sessionId])
+}
+
+enum AttendanceStatus {
+  PENDING
+  CHECKED_IN
+  ATTENDED
+  ABSENT
+  EXCUSED
+}
+
+model PerformanceRecord {
+  id            String     @id @default(cuid())
+  event         String
+  date          DateTime
+  timeSeconds   Float
+  rank          String
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
+
+  swimmerId     String
+  swimmer       Swimmer    @relation(fields: [swimmerId], references: [id], onDelete: Cascade)
+  
+  @@index([swimmerId])
+  @@index([date])
+}
+
+model Payment {
+  id            String     @id @default(cuid())
+  amount        Float
+  status        PaymentStatus @default(PENDING)
+  date          DateTime   @default(now())
+  description   String?
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
+
+  swimmerId     String
+  swimmer       Swimmer    @relation(fields: [swimmerId], references: [id], onDelete: Cascade)
+  
+  sessionId     String?
+  session       Session?   @relation(fields: [sessionId], references: [id], onDelete: SetNull)
+  
+  @@index([swimmerId])
+  @@index([status])
+}
+
+enum PaymentStatus {
+  PENDING
+  PAID
+  FAILED
+  REFUNDED
+}
+
+model TrainingGoal {
+  id            String     @id @default(cuid())
+  description   String
+  month         Int
+  year          Int
+  completed     Boolean    @default(false)
+  progressNote  String?
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
+
+  swimmerId     String
+  swimmer       Swimmer    @relation(fields: [swimmerId], references: [id], onDelete: Cascade)
+  
+  @@index([swimmerId])
+}
