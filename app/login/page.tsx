@@ -28,28 +28,47 @@ export default function LoginPage() {
 
       const resolvedRole = roleMap[email.toLowerCase()] || role;
 
+      const normalizedEmail = email.toLowerCase();
+      const redirectMap: { [key: string]: string } = {
+        ADMIN: "/dashboard",
+        COACH: "/training",
+        ACCOUNTANT: "/finances",
+        SWIMMER: "/performance",
+      };
+      const targetPage = redirectMap[resolvedRole] || "/dashboard";
+
       const result = await signIn("credentials", {
-        email,
+        email: normalizedEmail,
         password,
         role: resolvedRole,
         redirect: false,
+        callbackUrl: targetPage,
       });
 
-      if (result?.error) {
-        setError("Invalid email, password, or role");
-      } else if (result?.ok) {
-        // Redirect based on user role
-        const redirectMap: { [key: string]: string } = {
-          ADMIN: "/dashboard",
-          COACH: "/training",
-          ACCOUNTANT: "/finances",
-          SWIMMER: "/performance",
-        };
-        const targetPage = redirectMap[role] || redirectMap[resolvedRole] || "/dashboard";
+      console.log("SignIn result:", result);
+
+      if (!result) {
+        setError("Authentication failed. Please try again.");
+        return;
+      }
+
+      if (result.error) {
+        // show detailed server error when available
+        setError(typeof result.error === "string" ? result.error : JSON.stringify(result.error));
+      } else if (result.url) {
+        router.push(result.url);
+      } else {
         router.push(targetPage);
       }
     } catch (error) {
-      setError("An error occurred. Please try again.");
+      console.error("Login error:", error);
+      const message =
+        typeof error === "string"
+          ? error
+          : error instanceof Error
+          ? error.message
+          : JSON.stringify(error);
+      setError(message || "An error occurred. Please try again.");
     } finally {
       setIsLoading(false);
     }

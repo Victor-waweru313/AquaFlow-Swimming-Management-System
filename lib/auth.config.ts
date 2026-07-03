@@ -1,6 +1,5 @@
 import type { NextAuthConfig } from "next-auth";
 import Credentials from "next-auth/providers/credentials";
-import { PrismaAdapter } from "@auth/prisma-adapter";
 import { db } from "@/lib/db";
 import { comparePasswords, findDemoUserByEmail } from "@/lib/auth";
 import { z } from "zod";
@@ -11,15 +10,10 @@ const credentialsSchema = z.object({
   role: z.enum(["ADMIN", "COACH", "ACCOUNTANT", "SWIMMER"]),
 });
 
-const shouldUsePrismaAdapter = Boolean(
-  process.env.DATABASE_URL &&
-    !process.env.DATABASE_URL.includes("localhost") &&
-    !process.env.DATABASE_URL.includes("127.0.0.1") &&
-    !process.env.DATABASE_URL.includes("[user")
-);
-
 export const authConfig: NextAuthConfig = {
-  ...(shouldUsePrismaAdapter ? { adapter: PrismaAdapter(db) as any } : {}),
+  session: {
+    strategy: "jwt",
+  },
   providers: [
     Credentials({
       async authorize(credentials) {
@@ -29,7 +23,8 @@ export const authConfig: NextAuthConfig = {
           return null;
         }
 
-        const demoUser = await findDemoUserByEmail(validatedCredentials.data.email);
+        const normalizedEmail = validatedCredentials.data.email.toLowerCase();
+        const demoUser = await findDemoUserByEmail(normalizedEmail);
 
         let user: any = demoUser
           ? {
@@ -45,7 +40,7 @@ export const authConfig: NextAuthConfig = {
         if (!user) {
           try {
             user = await db.user.findUnique({
-              where: { email: validatedCredentials.data.email },
+              where: { email: normalizedEmail },
             });
           } catch (error) {
             console.error("Database auth fallback failed:", error);
@@ -91,6 +86,17 @@ export const authConfig: NextAuthConfig = {
         (session.user as any).role = token.role;
       }
       return session;
+    },
+    async redirect({ url, baseUrl }) {
+      if (!url.startsWith(baseUrl)) {
+        return url;
+      }
+
+      if (url === baseUrl || url === `${baseUrl}/login` || url === `${baseUrl}/api/auth/signin`) {
+        return baseUrl;
+      }
+
+      return url;
     },
   },
   pages: {

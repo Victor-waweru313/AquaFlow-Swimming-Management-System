@@ -20,6 +20,7 @@ const navItems: NavItem[] = [
   { href: "/performance", icon: "📈", label: "Performance", roles: ["ADMIN", "COACH", "ACCOUNTANT", "SWIMMER"] },
   { href: "/finances", icon: "💰", label: "Finances", roles: ["ADMIN", "ACCOUNTANT"] },
   { href: "/reports", icon: "📋", label: "Reports", roles: ["ADMIN", "ACCOUNTANT"] },
+  { href: "/admin/users", icon: "👨‍💼", label: "Users", roles: ["ADMIN"] },
 ];
 
 export function Sidebar() {

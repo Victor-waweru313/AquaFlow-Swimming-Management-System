@@ -2,6 +2,7 @@
 
 import { useSession, signOut } from "next-auth/react";
 import { useState, useRef, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import Link from "next/link";
 
 interface TopBarProps {
@@ -10,6 +11,7 @@ interface TopBarProps {
 }
 
 export function TopBar({ title, showSearch = true }: TopBarProps) {
+  const router = useRouter();
   const { data: session } = useSession();
   const [notificationCount, setNotificationCount] = useState(3);
   const [showUserMenu, setShowUserMenu] = useState(false);
@@ -88,9 +90,10 @@ export function TopBar({ title, showSearch = true }: TopBarProps) {
                 Profile Settings
               </Link>
               <button
-                onClick={() => {
-                  signOut({ callbackUrl: "/" });
+                onClick={async () => {
                   setShowUserMenu(false);
+                  await signOut({ redirect: false });
+                  router.push("/login");
                 }}
                 className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 last:rounded-b-lg"
               >

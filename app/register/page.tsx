@@ -47,12 +47,13 @@ export default function RegisterPage() {
 
     try {
       // Create the user account
+      const normalizedEmail = formData.email.toLowerCase();
       const createRes = await fetch("/api/auth/register", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           name: formData.name,
-          email: formData.email,
+          email: normalizedEmail,
           password: formData.password,
           role: "SWIMMER",
           dob: formData.dob,
@@ -68,14 +69,18 @@ export default function RegisterPage() {
 
       // Auto-login after registration
       const result = await signIn("credentials", {
-        email: formData.email,
+        email: normalizedEmail,
         password: formData.password,
         role: "SWIMMER",
         redirect: false,
       });
 
       if (result?.error) {
-        setError("Account created but login failed. Please login manually.");
+        setError(
+          result.error
+            ? `Account created but login failed: ${result.error}. Please login manually.`
+            : "Account created but login failed. Please login manually."
+        );
       } else if (result?.ok) {
         // Redirect swimmer to performance page
         router.push("/performance");

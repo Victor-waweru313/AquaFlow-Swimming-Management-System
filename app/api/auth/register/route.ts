@@ -1,5 +1,5 @@
 import { db } from "@/lib/db";
-import { hashPassword, registerDemoUser } from "@/lib/auth";
+import { hashPassword } from "@/lib/auth";
 import { z } from "zod";
 
 const registerSchema = z.object({
@@ -24,98 +24,61 @@ export async function POST(request: Request) {
     }
 
     const { name, email, password, role, dob, contact } = validation.data;
+    const normalizedEmail = email.toLowerCase();
 
-    const demoUser = await registerDemoUser({
-      name,
-      email,
-      password,
-      role,
+    const existingUser = await db.user.findUnique({
+      where: { email: normalizedEmail },
     });
 
-    if (demoUser) {
+    if (existingUser) {
       return Response.json(
-        {
-          message: "Registration successful",
-          user: {
-            id: demoUser.id,
-            email: demoUser.email,
-            name: demoUser.name,
-            role: demoUser.role,
-          },
-        },
-        { status: 201 }
+        { error: "Email already registered" },
+        { status: 400 }
       );
     }
 
-    try {
-      const existingUser = await db.user.findUnique({
-        where: { email },
-      });
+    const passwordHash = await hashPassword(password);
 
-      if (existingUser) {
-        return Response.json(
-          { error: "Email already registered" },
-          { status: 400 }
-        );
-      }
+    const user = await db.user.create({
+      data: {
+        name,
+        email: normalizedEmail,
+        passwordHash,
+        role,
+      },
+    });
 
-      const passwordHash = await hashPassword(password);
+    if (role === "SWIMMER") {
+      const count = await db.swimmer.count();
+      const swimmerCode = `AF-${1000 + count + 1}`;
 
-      const user = await db.user.create({
+      await db.swimmer.create({
         data: {
+          swimmerCode,
           name,
-          email,
-          passwordHash,
-          role,
+          email: normalizedEmail,
+          dob: new Date(dob),
+          gender: "Not specified",
+          membershipType: "STANDARD",
+          status: "ACTIVE",
+          contact: contact || "",
+          userId: user.id,
         },
       });
-
-      if (role === "SWIMMER") {
-        const count = await db.swimmer.count();
-        const swimmerCode = `AF-${1000 + count + 1}`;
-
-        await db.swimmer.create({
-          data: {
-            swimmerCode,
-            name,
-            email,
-            dob: new Date(dob),
-            gender: "Not specified",
-            membershipType: "STANDARD",
-            status: "ACTIVE",
-            contact: contact || "",
-            userId: user.id,
-          },
-        });
-      }
-
-      return Response.json(
-        {
-          message: "Registration successful",
-          user: {
-            id: user.id,
-            email: user.email,
-            name: user.name,
-            role: user.role,
-          },
-        },
-        { status: 201 }
-      );
-    } catch (error) {
-      console.error("Database registration failed, using demo auth fallback:", error);
-      return Response.json(
-        {
-          message: "Registration successful",
-          user: {
-            id: `demo-${Date.now()}`,
-            email,
-            name,
-            role,
-          },
-        },
-        { status: 201 }
-      );
     }
+
+    return Response.json(
+      {
+        message: "Registration successful",
+        user: {
+          id: user.id,
+          email: user.email,
+          name: user.name,
+          role: user.role,
+        },
+      },
+      { status: 201 }
+    );
   } catch (error) {
     console.error("Registration error:", error);
     return Response.json(
